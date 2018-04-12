@@ -220,7 +220,7 @@ public class GenerateRaw extends DapTestCommon
     {
         StandaloneMockMvcBuilder mvcbuilder = USED4TS
                 ? MockMvcBuilders.standaloneSetup(new D4TSController())
-                : MockMvcBuilders.standaloneSetup(new Dap4Controller());
+                : MockMvcBuilders.standaloneSetup(new Dap4Controller().setMocking(true));
         mvcbuilder.setValidator(new TestServlet.NullValidator());
         this.mockMvc = mvcbuilder.build();
         testSetup();

@@ -100,6 +100,21 @@ public class Dap4Controller extends DapController
         super();
     }
 
+    //////////////////////////////////////////////////
+    // Accessors
+
+    // Make the operation of getResourcePath depend
+    // on whether this controller is being mocked or not
+    // Eventually will not need if Spring Autowire X Mock
+    // can be made to work.
+
+    protected boolean mocking = false;
+    public Dap4Controller setMocking(boolean tf)
+    {
+	this.mocking = tf;
+	return this;
+    }
+
     //////////////////////////////////////////////////////////
 
     @Override
@@ -141,12 +156,14 @@ public class Dap4Controller extends DapController
     getResourcePath(DapRequest drq, String location)
             throws DapException
     {
-        String prefix = drq.getResourceRoot();
         String realpath;
-        if(prefix != null) {
+	if(this.mocking) {
+            String prefix = drq.getResourceRoot();
+            assert(prefix != null);
             realpath = DapUtil.canonjoin(prefix, location);
-        } else
+        } else {
             realpath = TdsRequestedDataset.getLocationFromRequestPath(location);
+        }
 
         if(!TESTING) {
             if(!TdsRequestedDataset.resourceControlOk(drq.getRequest(), drq.getResponse(), realpath))

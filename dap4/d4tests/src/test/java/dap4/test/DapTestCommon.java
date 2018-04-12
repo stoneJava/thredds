@@ -93,7 +93,7 @@ abstract public class DapTestCommon extends UnitTestCommon
         public Mocker(String servletname, String url, DapTestCommon parent)
                 throws Exception
         {
-            this(servletname, url, new Dap4Controller(), parent);
+            this(servletname, url, new Dap4Controller().setMocking(true), parent);
         }
 
         public Mocker(String servletname, String url, DapController controller, DapTestCommon parent)
@@ -270,7 +270,7 @@ abstract public class DapTestCommon extends UnitTestCommon
             if("d4ts".equals(pieces[1])) {
                 controller = new D4TSController();
             } else if("thredds".equals(pieces[1])) {
-                controller = new Dap4Controller();
+                controller = new Dap4Controller().setMocking(true);
             } else
                 throw new IOException("Unknown controller type " + pieces[1]);
             return controller;

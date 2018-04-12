@@ -175,7 +175,7 @@ public class TestServletConstraints extends DapTestCommon
             throws Exception
     {
         StandaloneMockMvcBuilder mvcbuilder =
-                MockMvcBuilders.standaloneSetup(new Dap4Controller());
+                MockMvcBuilders.standaloneSetup(new Dap4Controller().setMocking(true));
         mvcbuilder.setValidator(new TestServlet.NullValidator());
         this.mockMvc = mvcbuilder.build();
         testSetup();
