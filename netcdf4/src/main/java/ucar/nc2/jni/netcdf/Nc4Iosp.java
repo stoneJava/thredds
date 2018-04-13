@@ -72,6 +72,8 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
   static private String jnaPath = null;
   static private String libName = DEFAULTNETCDF4LIBNAME;
 
+  static private int log_level = 0;
+
   // TODO: These flags currently control debug messages that are printed to STDOUT. They ought to be logged to SLF4J.
   // We could use SLF4J markers to filter which debug-level messages are printed.
   // See http://stackoverflow.com/questions/12201112/can-i-add-custom-levels-to-slf4j
@@ -131,19 +133,22 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
         startupLog.warn(message, t);
       }
       String slevel = nullify(System.getProperty(JNA_LOG_LEVEL));
-      int newlevel = 0; // Force at least HDF5 traceback
-      if (slevel != null)
+      if (slevel != null) {
         try {
-          newlevel = Integer.parseInt(slevel);
+          int newlevel = Integer.parseInt(slevel);
+          log_level = newlevel;
         } catch (NumberFormatException nfe) {
-          newlevel = 0; /* To get HDF5 traceback */
+          // no change
         }
+      }
       try {
-        int oldlevel = nc4.nc_set_log_level(newlevel);
-        startupLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d", oldlevel, newlevel));
+        int oldlevel = setLogLevel(log_level);
+        startupLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d",
+                oldlevel, log_level));
       } catch (Throwable t) {
         String message = String.format(
-                "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').", newlevel, jnaPath, libName);
+                "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').",
+                log_level, jnaPath, libName);
         startupLog.warn("Nc4Iosp: "+t.getMessage());
         startupLog.warn(message);
       }
@@ -171,19 +176,25 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
       return isClibraryPresent() ? nc4 : null;
   }
 
+  /**
+   * Set the log level for loaded library
+   */
   static public synchronized int setLogLevel(int level)
-	throws IOException
+          throws IOException
   {
-      int oldlevel = -1;
-      if(!isClibraryPresent() || nc4 == null)
-	throw new IOException("Netcdf-c library not available");
+    int oldlevel = -1;
+    log_level = level;
+    if (nc4 != null) {
       try {
-	oldlevel = nc4.nc_set_log_level(level);
+        oldlevel = nc4.nc_set_log_level(log_level);
+        startupLog.info(String.format("NetcdfLoader: set log level: old=%d new=%d", oldlevel, log_level));
       } catch (Exception e) {
-	throw new IOException("Netcdf-c library not available",e);
+        throw new IOException("Netcdf-c library not available", e);
       }
-      return oldlevel;
+    }
+    return oldlevel;
   }
+
 
   /**
    * Convert a zero-length string to null

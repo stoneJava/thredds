@@ -28,12 +28,16 @@ abstract public class NetcdfLoader
     // Note that e.g. LD_LIBRARY_PATH may also be relevant.
     static String DFALT_NETCDF4LIBNAME = "netcdf";
 
+    static public final int DEFAULT_LOG_LEVEL = 0;
+
     //////////////////////////////////////////////////
     // Static variables
 
     static protected DapNetcdf nc4 = null;
     static protected String jnaPath = null;
     static protected String libName = DFALT_NETCDF4LIBNAME;
+
+    static int log_level = DEFAULT_LOG_LEVEL;
 
     /**
      * set the path and name of the netcdf c library.
@@ -47,21 +51,21 @@ abstract public class NetcdfLoader
     setLibraryAndPath(String jna_path, String lib_name)
     {
         lib_name = nullify(lib_name);
-        if(lib_name == null)
+        if (lib_name == null)
             lib_name = DFALT_NETCDF4LIBNAME;
         jna_path = nullify(jna_path);
-        if(jna_path == null)
+        if (jna_path == null)
             jna_path = nullify(System.getProperty(DFLAG_JNAPATH)); //get system property (-D flag).
-        if(jna_path == null) {
+        if (jna_path == null) {
             jna_path = nullify(System.getenv(ENV_JNAPATH));   // Next, try environment variable.
-            if(jna_path != null)
+            if (jna_path != null)
                 System.setProperty(DFLAG_JNAPATH, jna_path);
         }
 
         // If jna_path is null, the library might still be found
         // automatically from LD_LIBRARY_PATH or somewhere else
         // So complain but do not fail
-        if(jna_path == null)
+        if (jna_path == null)
             DapLog.warn(String.format("Neither -D%s nor getenv(%s) is defined",
                     DFLAG_JNAPATH, ENV_JNAPATH));
 
@@ -73,8 +77,8 @@ abstract public class NetcdfLoader
     load()
             throws IOException
     {
-        if(nc4 == null) {
-            if(jnaPath == null)
+        if (nc4 == null) {
+            if (jnaPath == null)
                 setLibraryAndPath(null, null);
             try {
                 // jna_path may still be null (the user didn't specify a "jna.library.path"), but try to load anyway;
@@ -83,7 +87,7 @@ abstract public class NetcdfLoader
                 nc4 = (DapNetcdf) Native.synchronizedLibrary(nc4);
                 String message = String.format("NetCDF-4 C library loaded (jna_path='%s', libname='%s').", jnaPath, libName);
                 String vermsg = String.format("Netcdf nc_inq_libvers='%s' isProtected=%s%n", nc4.nc_inq_libvers(), Native.isProtected());
-                if(DEBUG) {
+                if (DEBUG) {
                     System.out.println(message);
                     System.out.printf(vermsg);
                 } else {
@@ -95,7 +99,7 @@ abstract public class NetcdfLoader
             } catch (Throwable t) {
                 String message = String.format("NetCDF-4 C library not present (jna_path='%s', libname='%s'); %s.",
                         jnaPath, libName, t.getMessage());
-                if(DEBUG) {
+                if (DEBUG) {
                     System.err.println(message);
                     System.err.println(t.getMessage());
                 } else {
@@ -105,21 +109,23 @@ abstract public class NetcdfLoader
                 nc4 = null;
                 throw new IOException(message);
             }
+            assert (nc4 != null);
             String slevel = nullify(System.getProperty(DFLAG_LOG_LEVEL));
-            int newlevel = 0; // Force at least HDF5 traceback
-            if (slevel != null)
+            if (slevel != null) {
                 try {
-                    newlevel = Integer.parseInt(slevel);
+                    int newlevel = Integer.parseInt(slevel);
+                    log_level = newlevel;
                 } catch (NumberFormatException nfe) {
-                    newlevel = 0; /* To get HDF5 traceback */
+                    // ignore failure
                 }
+            }
             try {
-                int oldlevel = nc4.nc_set_log_level(newlevel);
-                DapLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d", oldlevel, newlevel));
+                setLogLevel(log_level);
             } catch (Throwable t) {
                 String message = String.format(
-                        "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').", newlevel, jnaPath, libName);
-                DapLog.warn("Nc4Iosp: "+t.getMessage());
+                        "NetcdfLoader: could not set log level (level=%d jna_path='%s', libname='%s').",
+                        log_level, jnaPath, libName);
+                DapLog.warn("NetcdfLoader: " + t.getMessage());
                 DapLog.warn(message);
             }
         }
@@ -138,6 +144,25 @@ abstract public class NetcdfLoader
     }
 
     /**
+     * Set the log level for loaded library
+     */
+    static public synchronized int setLogLevel(int level)
+            throws IOException
+    {
+        int oldlevel = -1;
+        log_level = level;
+        if (nc4 != null) {
+            try {
+                oldlevel = nc4.nc_set_log_level(log_level);
+                DapLog.info(String.format("NetcdfLoader: set log level: old=%d new=%d", oldlevel, log_level));
+            } catch (Exception e) {
+                throw new IOException("Netcdf-c library not available", e);
+            }
+        }
+        return oldlevel;
+    }
+
+    /**
      * Convert a zero-length string to null
      *
      * @param s the string to check for length
@@ -145,7 +170,7 @@ abstract public class NetcdfLoader
      */
     static protected String nullify(String s)
     {
-        if(s != null && s.length() == 0) s = null;
+        if (s != null && s.length() == 0) s = null;
         return s;
     }
 

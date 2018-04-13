@@ -10,6 +10,7 @@ import dap4.core.util.DapDump;
 import dap4.dap4lib.ChunkInputStream;
 import dap4.dap4lib.FileDSP;
 import dap4.dap4lib.RequestMode;
+import dap4.dap4lib.netcdf.NetcdfLoader;
 import dap4.servlet.DapCache;
 import dap4.servlet.Generator;
 import dap4.servlet.SynDSP;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import thredds.server.dap4.Dap4Controller;
+import ucar.nc2.jni.netcdf.Nc4Iosp;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -145,7 +147,8 @@ public class TestServlet extends DapTestCommon
             throws Exception
     {
         //if(DEBUGDATA) DapController.DUMPDATA = true;
-
+        NetcdfLoader.setLogLevel(5);
+        Nc4Iosp.setLogLevel(5);
         StandaloneMockMvcBuilder mvcbuilder =
                 MockMvcBuilders.standaloneSetup(new Dap4Controller().setMocking(true));
         mvcbuilder.setValidator(new TestServlet.NullValidator());
