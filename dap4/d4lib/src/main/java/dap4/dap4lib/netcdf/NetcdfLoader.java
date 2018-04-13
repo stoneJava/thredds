@@ -6,6 +6,7 @@ package dap4.dap4lib.netcdf;
 
 import com.sun.jna.Native;
 import dap4.dap4lib.DapLog;
+import dap4.dap4lib.DapStartLog;
 
 import java.io.IOException;
 
@@ -21,6 +22,8 @@ abstract public class NetcdfLoader
     static public final boolean DEBUG = false;
 
     static public final String DFLAG_JNAPATH = "jna.library.path";
+    static public final String DFLAG_LOG_LEVEL = "jna.library.loglevel";
+
     static public final String ENV_JNAPATH = "JNA_PATH"; // environment var
     // Note that e.g. LD_LIBRARY_PATH may also be relevant.
     static String DFALT_NETCDF4LIBNAME = "netcdf";
@@ -84,9 +87,11 @@ abstract public class NetcdfLoader
                     System.out.println(message);
                     System.out.printf(vermsg);
                 } else {
-                    DapLog.info(message);
-                    DapLog.info(vermsg);
+                    DapStartLog.info(message);
+                    DapStartLog.info(vermsg);
                 }
+                DapStartLog.info(String.format("Nc4Iosp: NetCDF-4 C library loaded (jna_path='%s', libname='%s').", jnaPath, libName));
+                DapStartLog.debug(String.format("Netcdf nc_inq_libvers='%s' isProtected=%s", nc4.nc_inq_libvers(), Native.isProtected()));
             } catch (Throwable t) {
                 String message = String.format("NetCDF-4 C library not present (jna_path='%s', libname='%s'); %s.",
                         jnaPath, libName, t.getMessage());
@@ -99,6 +104,23 @@ abstract public class NetcdfLoader
                 }
                 nc4 = null;
                 throw new IOException(message);
+            }
+            String slevel = nullify(System.getProperty(DFLAG_LOG_LEVEL));
+            int newlevel = 0; // Force at least HDF5 traceback
+            if (slevel != null)
+                try {
+                    newlevel = Integer.parseInt(slevel);
+                } catch (NumberFormatException nfe) {
+                    newlevel = 0; /* To get HDF5 traceback */
+                }
+            try {
+                int oldlevel = nc4.nc_set_log_level(newlevel);
+                DapLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d", oldlevel, newlevel));
+            } catch (Throwable t) {
+                String message = String.format(
+                        "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').", newlevel, jnaPath, libName);
+                DapLog.warn("Nc4Iosp: "+t.getMessage());
+                DapLog.warn(message);
             }
         }
         return nc4;
