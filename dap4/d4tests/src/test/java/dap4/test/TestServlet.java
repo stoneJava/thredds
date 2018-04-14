@@ -189,16 +189,23 @@ public class TestServlet extends DapTestCommon
     public void testServlet()
             throws Exception
     {
-        NetcdfLoader.setLogLevel(5);
-        Nc4Iosp.setLogLevel(5);
+        boolean hasloglevel = false;
+        try {
+            NetcdfLoader.setLogLevel(5);
+            Nc4Iosp.setLogLevel(5);
+        } catch (Throwable e) {
+            hasloglevel = false;
+        }
 	try {
         DapCache.flush();
         for(TestCase testcase : chosentests) {
             doOneTest(testcase);
         }
 	} finally {
-        NetcdfLoader.setLogLevel(0);
-        Nc4Iosp.setLogLevel(0);
+        if(hasloglevel) {
+            NetcdfLoader.setLogLevel(0);
+            Nc4Iosp.setLogLevel(0);
+        }
 	}
     }
 

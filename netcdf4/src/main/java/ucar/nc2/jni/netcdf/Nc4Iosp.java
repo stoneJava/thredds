@@ -166,7 +166,7 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
    */
   static public synchronized boolean isClibraryPresent() {
     if (isClibraryPresent == null) {
-      isClibraryPresent = load() != null;
+       isClibraryPresent = load() != null;
     }
     return isClibraryPresent;
   }
