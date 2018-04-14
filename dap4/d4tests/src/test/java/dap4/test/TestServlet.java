@@ -147,8 +147,6 @@ public class TestServlet extends DapTestCommon
             throws Exception
     {
         //if(DEBUGDATA) DapController.DUMPDATA = true;
-        NetcdfLoader.setLogLevel(5);
-        Nc4Iosp.setLogLevel(5);
         StandaloneMockMvcBuilder mvcbuilder =
                 MockMvcBuilders.standaloneSetup(new Dap4Controller().setMocking(true));
         mvcbuilder.setValidator(new TestServlet.NullValidator());
@@ -191,10 +189,17 @@ public class TestServlet extends DapTestCommon
     public void testServlet()
             throws Exception
     {
+        NetcdfLoader.setLogLevel(5);
+        Nc4Iosp.setLogLevel(5);
+	try {
         DapCache.flush();
         for(TestCase testcase : chosentests) {
             doOneTest(testcase);
         }
+	} finally {
+        NetcdfLoader.setLogLevel(0);
+        Nc4Iosp.setLogLevel(0);
+	}
     }
 
     //////////////////////////////////////////////////
