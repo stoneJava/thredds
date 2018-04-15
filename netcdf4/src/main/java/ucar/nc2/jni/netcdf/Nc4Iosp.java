@@ -124,7 +124,8 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
         // the necessary libs may be on the system PATH or on LD_LIBRARY_PATH
         nc4 = (Nc4prototypes) Native.loadLibrary(libName, Nc4prototypes.class);
         // Make the library synchronized
-        nc4 = (Nc4prototypes) Native.synchronizedLibrary(nc4);
+        //nc4 = (Nc4prototypes) Native.synchronizedLibrary(nc4);
+	    nc4 = new Nc4wrapper(nc4);
         startupLog.info("Nc4Iosp: NetCDF-4 C library loaded (jna_path='{}', libname='{}').", jnaPath, libName);
         startupLog.debug("Netcdf nc_inq_libvers='{}' isProtected={}", nc4.nc_inq_libvers(), Native.isProtected());
       } catch (Throwable t) {
