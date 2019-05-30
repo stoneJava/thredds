@@ -5,6 +5,8 @@
 
 package thredds.server.viewer;
 
+import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,12 +19,16 @@ import java.util.List;
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 
-import com.coverity.security.Escape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import thredds.client.catalog.*;
+import thredds.core.AllowedServices;
+import thredds.core.StandardService;
+import thredds.server.config.TdsContext;
+import thredds.server.notebook.JupyterNotebookServiceCache;
 import ucar.nc2.constants.FeatureType;
 import ucar.nc2.util.IO;
 import ucar.unidata.util.StringUtil2;
@@ -38,6 +44,15 @@ public class ViewerServiceImpl implements ViewerService {
 
   private List<Viewer> viewers = new ArrayList<>();
   private HashMap<String, String> templates = new HashMap<>();
+
+  @Autowired
+  private TdsContext tdsContext;
+
+  @Autowired
+  private JupyterNotebookServiceCache  jupyterNotebooks;
+
+  @Autowired
+  private AllowedServices allowedServices;
 
   @Override
   public List<Viewer> getViewers() {
@@ -103,82 +118,75 @@ public class ViewerServiceImpl implements ViewerService {
     out.format("</ul>\r\n");
   }
 
+  @Override
+  public List<ViewerLinkProvider.ViewerLink> getViewerLinks(Dataset dataset, HttpServletRequest req) {
+    List<ViewerLinkProvider.ViewerLink> viewerLinks = new ArrayList<>();
+
+    for (Viewer viewer : viewers) {
+      if (viewer.isViewable(dataset)) {
+        if (viewer instanceof ViewerLinkProvider) {
+          viewerLinks.addAll(((ViewerLinkProvider) viewer).getViewerLinks(dataset, req));
+        } else {
+          viewerLinks.add(viewer.getViewerLink(dataset, req));
+        }
+      }
+    }
+    return viewerLinks;
+  }
+
   @SuppressWarnings("unused")
   @PostConstruct
   private void registerViewers() {
     registerViewer(new Godiva3Viewer());
-    registerViewer(new ToolsUI());
-    registerViewer(new IDV());
     registerViewer(new StaticView());
+    registerViewer(new JupyterNotebookViewer(jupyterNotebooks, allowedServices, tdsContext.getContentRootPathProperty()));
   }
 
   // Viewers...
-  // ToolsUI
-  private static class ToolsUI implements Viewer {
+
+  private static class JupyterNotebookViewer implements Viewer {
+    private static final String title = "Jupyter Notebook viewer";
+
+    private JupyterNotebookServiceCache jupyterNotebooks;
+
+    private AllowedServices allowedServices;
+
+    private String contentDir;
+
+    public JupyterNotebookViewer (JupyterNotebookServiceCache jupyterNotebooks, AllowedServices allowedServices, String contentDir) {
+      this.jupyterNotebooks = jupyterNotebooks;
+      this.allowedServices = allowedServices;
+      this.contentDir = contentDir;
+    }
 
     public boolean isViewable(Dataset ds) {
-      String id = ds.getID();
-      return ((id != null) && ds.hasAccess());
+      return this.allowedServices.isAllowed(StandardService.jupyterNotebook)
+        && jupyterNotebooks.getNotebookFilename(ds) != null;
     }
 
-    public String getViewerLinkHtml(Dataset ds, HttpServletRequest req) {
-      String base = ds.getParentCatalog().getUriString();
-      if (base.endsWith(".html"))
-        base = base.substring(0, base.length() - 5) + ".xml";
-      Formatter query = new Formatter();
-      query.format("<a href='%s/view/ToolsUI.jnlp?", req.getContextPath());
-      query.format("catalog=%s&amp;dataset=%s'>NetCDF-Java ToolsUI (webstart)</a>", base, ds.getID());
-      return query.toString();
-    }
-  }
-
-  // IDV
-  private static class IDV implements Viewer {
-
-    public boolean isViewable(Dataset ds) {
-      Access access = getOpendapAccess(ds);
-      if (access == null)
-        return false;
-
-      FeatureType dt = ds.getFeatureType();
-      return dt == FeatureType.GRID;
+    public String getViewerLinkHtml( Dataset ds, HttpServletRequest req) {
+      ViewerLinkProvider.ViewerLink viewerLink = this.getViewerLink(ds, req);
+      return "<a href='" + viewerLink.getUrl() +  "'>" + viewerLink.getTitle() + "</a>";
     }
 
-    public String getViewerLinkHtml(Dataset ds, HttpServletRequest req) {
-      Access access = getOpendapAccess(ds);
-      if (access == null)
-        return null;
-
-      URI dataURI = access.getStandardUri();
-      if (dataURI == null) {
-        logger.warn("IDVViewer access URL failed on {}", ds.getName());
-        return null;
+    public ViewerLinkProvider.ViewerLink getViewerLink(Dataset ds, HttpServletRequest req) {
+      String catUrl = ds.getCatalogUrl();
+      if (catUrl.indexOf('#') > 0)
+        catUrl = catUrl.substring(0, catUrl.lastIndexOf('#'));
+      if (catUrl.indexOf(contentDir) > -1) {
+        catUrl = catUrl.substring(catUrl.indexOf(contentDir) + contentDir.length());
       }
-      if (!dataURI.isAbsolute()) {
-        try {
-          URI base = new URI(req.getRequestURL().toString());
-          dataURI = base.resolve(dataURI);
-          // System.out.println("Resolve URL with "+req.getRequestURL()+" got= "+dataURI.toString());
-        } catch (URISyntaxException e) {
-          logger.error("Resolve URL with " + req.getRequestURL(), e);
-        }
-      }
+      String catalogServiceBase = StandardService.catalogRemote.getBase();
+      catUrl = catUrl.substring(catUrl.indexOf(catalogServiceBase) + catalogServiceBase.length()).replace("html", "xml");
 
-      return "<a href='" + req.getContextPath() + "/view/idv.jnlp?url="
-              + dataURI.toString()
-              + "'>Integrated Data Viewer (IDV) (webstart)</a>";
-    }
-
-    private Access getOpendapAccess(Dataset ds) {
-      Access access = ds.getAccess(ServiceType.DODS);
-      if (access == null)
-        access = ds.getAccess(ServiceType.OPENDAP);
-      return access;
+      String url = req.getContextPath() + StandardService.jupyterNotebook.getBase() + ds.getID() + "?catalog=" + catUrl;
+      return new ViewerLinkProvider.ViewerLink(JupyterNotebookViewer.title, url);
     }
   }
 
   // LOOK whats this for ??
   private static final String propertyNamePrefix = "viewer";
+
   private static class StaticView implements ViewerLinkProvider {
 
     public boolean isViewable(Dataset ds) {
@@ -191,6 +199,14 @@ public class ViewerServiceImpl implements ViewerService {
         return null;
       ViewerLink firstLink = viewerLinks.get(0);
       return "<a href='" + firstLink.getUrl() + "'>" + firstLink.getTitle() + "</a>";
+    }
+
+    @Override
+    public ViewerLink getViewerLink(Dataset ds, HttpServletRequest req) {
+      List<ViewerLink> viewerLinks = getViewerLinks(ds, req);
+      if (viewerLinks.isEmpty())
+        return null;
+      return viewerLinks.get(0);
     }
 
     @Override

@@ -229,7 +229,7 @@ public class StructureDS extends ucar.nc2.Structure implements VariableEnhanced 
       //return Array.factoryConstant(dataType.getPrimitiveClassType(), section.getShape(), data);
     }
 
-    // do any needed conversions (scale/offset, enums, etc)
+    // do any needed conversions (enum/scale/offset/missing/unsigned, etc)
     return convert(result, section);
   }
 
@@ -260,7 +260,7 @@ public class StructureDS extends ucar.nc2.Structure implements VariableEnhanced 
   }
 
   // possible things needed:
-  //   1) scale/offset/enum conversion
+  //   1) enum/scale/offset/missing/unsigned conversion
   //   2) name, info change
   //   3) variable with cached data added to StructureDS through NcML
 
@@ -273,7 +273,7 @@ public class StructureDS extends ucar.nc2.Structure implements VariableEnhanced 
     }
 
     // LOOK! converting to ArrayStructureMA
-    // do any scale/offset/enum conversions
+    // do any enum/scale/offset/missing/unsigned conversions
     ArrayStructure newAS = ArrayStructureMA.factoryMA(orgAS);
     for (StructureMembers.Member m : newAS.getMembers()) {
       VariableEnhanced v2 = (VariableEnhanced) findVariable(m.getName());
@@ -285,7 +285,9 @@ public class StructureDS extends ucar.nc2.Structure implements VariableEnhanced 
         VariableDS vds = (VariableDS) v2;
         if (vds.needConvert()) {
           Array mdata = newAS.extractMemberArray(m);
-          mdata = vds.convert(mdata);
+          // mdata has not yet been enhanced, but vds would *think* that it has been if we used the 1-arg version of
+          // VariableDS.convert(). So, we use the 2-arg version to explicitly request enhancement.
+          mdata = vds.convert(mdata, vds.getEnhanceMode());
           newAS.setMemberArray(m, mdata);
         }
 
@@ -367,7 +369,9 @@ public class StructureDS extends ucar.nc2.Structure implements VariableEnhanced 
         Array mdata = orgData.getArray(m);
 
         if (vds.needConvert())
-          mdata = vds.convert(mdata);
+          // mdata has not yet been enhanced, but vds would *think* that it has been if we used the 1-arg version of
+          // VariableDS.convert(). So, we use the 2-arg version to explicitly request enhancement.
+          mdata = vds.convert(mdata, vds.getEnhanceMode());
 
         result.setMemberData(mResult, mdata);
       }

@@ -25,6 +25,8 @@ public class HtmlConfigBean {
 
   private String pageCssUrl;
   private String catalogCssUrl;
+  private String datasetCssUrl;
+  private String openDapCssUrl;
   private String googleTrackingCode;
 
   private String folderIconUrl;
@@ -43,6 +45,8 @@ public class HtmlConfigBean {
   private String hostInstLogoAlt;
 
   private boolean useRemoteCatalogService;
+
+  private boolean generateDatasetJsonLD;
 
   public HtmlConfigBean() {
   }
@@ -151,6 +155,22 @@ public class HtmlConfigBean {
   }
 
   /**
+   * Return the URL to the CSS file used for the OPeNDAP access pages.
+   * <p/>
+   * <p>Note: A relative URL is considered relative to the webapp context path.
+   * That is, it is relative to "http://server:port/thredds/".
+   *
+   * @return the URL to the CSS file used for the OPeNDAP access pages.
+   */
+  public String getOpenDapCssUrl() {
+    return openDapCssUrl;
+  }
+
+  public void setOpenDapCssUrl(String openDapCssUrl) {
+    this.openDapCssUrl = openDapCssUrl;
+  }
+
+  /**
    * Return the URL to the CSS file used for catalog HTML pages.
    * <p/>
    * <p>Note: A relative URL is considered relative to the webapp context path.
@@ -164,6 +184,22 @@ public class HtmlConfigBean {
 
   public void setCatalogCssUrl(String catalogCssUrl) {
     this.catalogCssUrl = catalogCssUrl;
+  }
+
+  /**
+   * Return the URL to the CSS file used for catalog HTML pages.
+   * <p/>
+   * <p>Note: A relative URL is considered relative to the webapp context path.
+   * That is, it is relative to "http://server:port/thredds/".
+   *
+   * @return the URL to the CSS file used for catalog HTML pages.
+   */
+  public String getDatasetCssUrl() {
+    return datasetCssUrl;
+  }
+
+  public void setDatasetCssUrl(String datasetCssUrl) {
+    this.datasetCssUrl = datasetCssUrl;
   }
 
   /**
@@ -360,6 +396,18 @@ public class HtmlConfigBean {
   }
 
   /**
+   * Return the config option that determines whether or not to DataSet JSON-LD elements are
+   * generated in the head of the html for direct datasets.
+   *
+   * @return true: generate json-ld, false: do not generate json-ld.
+   */
+  public Boolean getGenerateDatasetJsonLD() { return generateDatasetJsonLD; }
+
+  public void setGenerateDatasetJsonLD(Boolean generateDatasetJsonLD) {
+    this.generateDatasetJsonLD = generateDatasetJsonLD;
+  }
+
+  /**
    * Return a URL ready to use in a generated HTML page from a URL that
    * is either absolute or relative to the webapp context path. That is,
    * if relative, it is relative to "http://server:port/thredds/".
@@ -389,11 +437,13 @@ public class HtmlConfigBean {
   public void addHtmlConfigInfoToModel(Map<String, Object> model) {
     model.put("catalogCssUrl", this.getCatalogCssUrl());
     model.put("standardCssUrl", this.getPageCssUrl());
+    model.put("openDapCssUrl", this.getOpenDapCssUrl());
     model.put("googleTrackingCode", this.getGoogleTrackingCode());
     model.put("datasetIconAlt", this.getDatasetIconAlt());
     model.put("datasetIconUrl", this.getDatasetIconUrl());
     model.put("folderIconAlt", this.getFolderIconAlt());
     model.put("folderIconUrl", this.getFolderIconUrl());
+    model.put("generateDatasetJsonLD", this.getGenerateDatasetJsonLD());
 
     model.put("hostInstName", this.getHostInstName());
     model.put("hostInstUrl", this.prepareUrlStringForHtml(this.getHostInstUrl()));

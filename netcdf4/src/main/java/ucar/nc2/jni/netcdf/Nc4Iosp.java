@@ -72,6 +72,8 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
   static private String jnaPath = null;
   static private String libName = DEFAULTNETCDF4LIBNAME;
 
+  static private int log_level = 0;
+
   // TODO: These flags currently control debug messages that are printed to STDOUT. They ought to be logged to SLF4J.
   // We could use SLF4J markers to filter which debug-level messages are printed.
   // See http://stackoverflow.com/questions/12201112/can-i-add-custom-levels-to-slf4j
@@ -122,7 +124,8 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
         // the necessary libs may be on the system PATH or on LD_LIBRARY_PATH
         nc4 = (Nc4prototypes) Native.loadLibrary(libName, Nc4prototypes.class);
         // Make the library synchronized
-        nc4 = (Nc4prototypes) Native.synchronizedLibrary(nc4);
+        //nc4 = (Nc4prototypes) Native.synchronizedLibrary(nc4);
+	    nc4 = new Nc4wrapper(nc4);
         startupLog.info("Nc4Iosp: NetCDF-4 C library loaded (jna_path='{}', libname='{}').", jnaPath, libName);
         startupLog.debug("Netcdf nc_inq_libvers='{}' isProtected={}", nc4.nc_inq_libvers(), Native.isProtected());
       } catch (Throwable t) {
@@ -131,19 +134,22 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
         startupLog.warn(message, t);
       }
       String slevel = nullify(System.getProperty(JNA_LOG_LEVEL));
-      int newlevel = 0; // Force at least HDF5 traceback
-      if (slevel != null)
+      if (slevel != null) {
         try {
-          newlevel = Integer.parseInt(slevel);
+          int newlevel = Integer.parseInt(slevel);
+          log_level = newlevel;
         } catch (NumberFormatException nfe) {
-          newlevel = 0; /* To get HDF5 traceback */
+          // no change
         }
+      }
       try {
-        int oldlevel = nc4.nc_set_log_level(newlevel);
-        startupLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d", oldlevel, newlevel));
+        int oldlevel = setLogLevel(log_level);
+        startupLog.info(String.format("Nc4Iosp: set log level: old=%d new=%d",
+                oldlevel, log_level));
       } catch (Throwable t) {
         String message = String.format(
-                "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').", newlevel, jnaPath, libName);
+                "Nc4Iosp: could not set log level (level=%d jna_path='%s', libname='%s').",
+                log_level, jnaPath, libName);
         startupLog.warn("Nc4Iosp: "+t.getMessage());
         startupLog.warn(message);
       }
@@ -161,7 +167,7 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
    */
   static public synchronized boolean isClibraryPresent() {
     if (isClibraryPresent == null) {
-      isClibraryPresent = load() != null;
+       isClibraryPresent = load() != null;
     }
     return isClibraryPresent;
   }
@@ -171,19 +177,25 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
       return isClibraryPresent() ? nc4 : null;
   }
 
+  /**
+   * Set the log level for loaded library.
+   * Do nothing if set_log_level is not available.
+   */
   static public synchronized int setLogLevel(int level)
-	throws IOException
   {
-      int oldlevel = -1;
-      if(!isClibraryPresent() || nc4 == null)
-	throw new IOException("Netcdf-c library not available");
+    int oldlevel = -1;
+    log_level = level;
+    if (nc4 != null) {
       try {
-	oldlevel = nc4.nc_set_log_level(level);
-      } catch (Exception e) {
-	throw new IOException("Netcdf-c library not available",e);
+        oldlevel = nc4.nc_set_log_level(log_level);
+        startupLog.info(String.format("NetcdfLoader: set log level: old=%d new=%d", oldlevel, log_level));
+      } catch (java.lang.UnsatisfiedLinkError e) {
+        // ignore
       }
-      return oldlevel;
+    }
+    return oldlevel;
   }
+
 
   /**
    * Convert a zero-length string to null
@@ -361,7 +373,7 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
     if (format == Nc4prototypes.NC_FORMAT_NETCDF4) {
       // read subordinate groups
       IntByReference numgrps = new IntByReference();
-      ret = nc4.nc_inq_grps(g4.grpid, numgrps, Pointer.NULL);
+      ret = nc4.nc_inq_grps(g4.grpid, numgrps, null);
       if (ret != 0)
         throw new IOException(ret + ": " + nc4.nc_strerror(ret));
       int[] group_ids = new int[numgrps.getValue()];
@@ -546,8 +558,16 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
           case Nc4prototypes.NC_UBYTE:
             att = new Attribute(attname, DataType.UBYTE);
             break;
-          case Nc4prototypes.NC_CHAR: // a zero length char is considered to be an empty string
-            att = new Attribute(attname, "");
+          case Nc4prototypes.NC_CHAR:
+            // From what I can tell, the way we should treat char attrs depends on
+            // the netCDF format used (3 vs. 4)
+            if ((format == NC_FORMAT_NETCDF4_CLASSIC) || (format == NC_FORMAT_NETCDF4)) {
+              // if netcdf4, make null char attrs null string attrs
+              att = new Attribute(attname, DataType.STRING);
+            } else {
+              // all others, treat null char attrs as empty string attrs
+              att = new Attribute(attname, "");
+            }
             break;
           case Nc4prototypes.NC_DOUBLE:
             att = new Attribute(attname, DataType.DOUBLE);
@@ -1136,7 +1156,7 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
     IntByReference ndimsp = new IntByReference();
     IntByReference nattsp = new IntByReference();
 
-    int ret = nc4.nc_inq_var(grpid, varno, name, xtypep, ndimsp, Pointer.NULL, nattsp);
+    int ret = nc4.nc_inq_var(grpid, varno, name, xtypep, ndimsp, null, nattsp);
     if(ret != 0)
       throw new IOException("nc_inq_var faild: code="+ret);
     String vname = makeString(name);
@@ -1415,7 +1435,7 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
   private void makeUserTypes(int grpid, Group g) throws IOException {
     // find user types in this group
     IntByReference ntypesp = new IntByReference();
-    int ret = nc4.nc_inq_typeids(grpid, ntypesp, Pointer.NULL);
+    int ret = nc4.nc_inq_typeids(grpid, ntypesp, null);
     if (ret != 0)
       throw new IOException(ret + ": " + nc4.nc_strerror(ret));
     int ntypes = ntypesp.getValue();
@@ -2803,16 +2823,17 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
   private void writeAttribute(int grpid, int varid, Attribute att, Variable v) throws IOException {
     if (v != null && att.getShortName().equals(CDM.FILL_VALUE)) {
       if (att.getLength() != 1) {
-        log.warn("_FillValue length must be one on var = " + v.getFullName());
+        log.warn("_FillValue length must be one on var = {}", v.getFullName());
         return;
       }
       if (att.getDataType() != v.getDataType()) {
-        log.warn("_FillValue type must agree with var = " + v.getFullName() + " type " + att.getDataType() + "!=" + v.getDataType());
-        return;
-      }
-      if (att.isUnsigned() != v.getDataType().isUnsigned()) {
-        log.warn("_FillValue isUnsigned must agree with var = " + v.getFullName() + " isUnsigned " + att.isUnsigned() + "!=" + v.getDataType().isUnsigned());
-        return;
+	    // Special case hack for _FillValue type match for char typed variables
+        if(att.getDataType() != DataType.STRING
+           || v.getDataType() != DataType.CHAR) {
+          log.warn("_FillValue type ({}) does not agree with variable '{}' type ({}).",
+                att.getDataType(), v.getFullName(), v.getDataType());
+          return;
+        } // else char typed variable with string typed _FillValue
       }
     }
 
@@ -2828,49 +2849,70 @@ public class Nc4Iosp extends AbstractIOServiceProvider implements IOServiceProvi
 
     int ret = 0;
     Array values = att.getValues();
+    Object arrayStorage = null;
+    if (values != null) {
+      arrayStorage = values.getStorage();
+    }
     switch (att.getDataType()) {
       case STRING: // problem may be that we are mapping char * atts to string type
-        if (att.getLength() == 1 && !att.getShortName().equals(CDM.FILL_VALUE)) {
-          byte[] svalb = att.getStringValue().getBytes(CDM.utf8Charset);
-          ret = nc4.nc_put_att_text(grpid, varid, att.getShortName(), new SizeT(svalb.length), svalb);
-        } else {
-          String[] svalues = new String[att.getLength()];
-          for (int i = 0; i < att.getLength(); i++) svalues[i] = (String) att.getValue(i);
-          ret = nc4.nc_put_att_string(grpid, varid, att.getShortName(), new SizeT(att.getLength()), svalues);
+        if(v != null
+	        && att.getShortName().equals(CDM.FILL_VALUE)
+           && att.getLength() == 1
+           && v.getDataType() == DataType.CHAR) {
+           // special handling of _FillValue if v.getDataType() == CHAR
+           byte[] svalb = att.getStringValue().getBytes(CDM.utf8Charset);
+           // if svalb is a zero length array, force it to be the null char
+           if(svalb.length == 0) svalb = new byte[]{0};
+           ret = nc4.nc_put_att_text(grpid, varid, att.getShortName(), new SizeT(svalb.length), svalb);
+        } else { // String valued attribute
+            if(this.version != NetcdfFileWriter.Version.netcdf4) {
+                // Must write it as character typed attribute
+                StringBuilder text = new StringBuilder();
+                // Concatenate all the attribute strings
+                for(int i=0;i<att.getLength();i++)
+                    text.append(att.getStringValue(i));
+                byte[] svalb = text.toString().getBytes(CDM.utf8Charset);
+                if(svalb.length == 0) svalb = new byte[]{0};
+                ret = nc4.nc_put_att_text(grpid, varid, att.getShortName(), new SizeT(svalb.length), svalb);
+            } else { // Can write as string typed attribute
+                String[] svalues = new String[att.getLength()];
+                for(int i = 0; i < att.getLength(); i++) svalues[i] = (String) att.getValue(i);
+                ret = nc4.nc_put_att_string(grpid, varid, att.getShortName(), new SizeT(att.getLength()), svalues);
+            }
         }
         break;
       case UBYTE:
-        ret = nc4.nc_put_att_uchar(grpid, varid, att.getShortName(), Nc4prototypes.NC_UBYTE, new SizeT(att.getLength()), (byte[]) values.getStorage());
+        ret = nc4.nc_put_att_uchar(grpid, varid, att.getShortName(), Nc4prototypes.NC_UBYTE, new SizeT(att.getLength()), (byte[]) arrayStorage);
         break;
       case BYTE:
-        ret = nc4.nc_put_att_schar(grpid, varid, att.getShortName(), Nc4prototypes.NC_BYTE, new SizeT(att.getLength()), (byte[]) values.getStorage());
+        ret = nc4.nc_put_att_schar(grpid, varid, att.getShortName(), Nc4prototypes.NC_BYTE, new SizeT(att.getLength()), (byte[]) arrayStorage);
         break;
       case CHAR:
-        ret = nc4.nc_put_att_text(grpid, varid, att.getShortName(), new SizeT(att.getLength()), IospHelper.convertCharToByte((char[]) values.getStorage()));
+        ret = nc4.nc_put_att_text(grpid, varid, att.getShortName(), new SizeT(att.getLength()), IospHelper.convertCharToByte((char[]) arrayStorage));
         break;
       case DOUBLE:
-        ret = nc4.nc_put_att_double(grpid, varid, att.getShortName(), Nc4prototypes.NC_DOUBLE, new SizeT(att.getLength()), (double[]) values.getStorage());
+        ret = nc4.nc_put_att_double(grpid, varid, att.getShortName(), Nc4prototypes.NC_DOUBLE, new SizeT(att.getLength()), (double[]) arrayStorage);
         break;
       case FLOAT:
-        ret = nc4.nc_put_att_float(grpid, varid, att.getShortName(), Nc4prototypes.NC_FLOAT, new SizeT(att.getLength()), (float[]) values.getStorage());
+        ret = nc4.nc_put_att_float(grpid, varid, att.getShortName(), Nc4prototypes.NC_FLOAT, new SizeT(att.getLength()), (float[]) arrayStorage);
         break;
       case UINT:
-        ret = nc4.nc_put_att_uint(grpid, varid, att.getShortName(), Nc4prototypes.NC_UINT, new SizeT(att.getLength()), (int[]) values.getStorage());
+        ret = nc4.nc_put_att_uint(grpid, varid, att.getShortName(), Nc4prototypes.NC_UINT, new SizeT(att.getLength()), (int[]) arrayStorage);
         break;
       case INT:
-        ret = nc4.nc_put_att_int(grpid, varid, att.getShortName(), Nc4prototypes.NC_INT, new SizeT(att.getLength()), (int[]) values.getStorage());
+        ret = nc4.nc_put_att_int(grpid, varid, att.getShortName(), Nc4prototypes.NC_INT, new SizeT(att.getLength()), (int[]) arrayStorage);
         break;
       case ULONG:
-        ret = nc4.nc_put_att_ulonglong(grpid, varid, att.getShortName(), Nc4prototypes.NC_UINT64, new SizeT(att.getLength()), (long[]) values.getStorage());
+        ret = nc4.nc_put_att_ulonglong(grpid, varid, att.getShortName(), Nc4prototypes.NC_UINT64, new SizeT(att.getLength()), (long[]) arrayStorage);
         break;
       case LONG:
-        ret = nc4.nc_put_att_longlong(grpid, varid, att.getShortName(), Nc4prototypes.NC_INT64, new SizeT(att.getLength()), (long[]) values.getStorage());
+        ret = nc4.nc_put_att_longlong(grpid, varid, att.getShortName(), Nc4prototypes.NC_INT64, new SizeT(att.getLength()), (long[]) arrayStorage);
         break;
       case USHORT:
-        ret = nc4.nc_put_att_ushort(grpid, varid, att.getShortName(), Nc4prototypes.NC_USHORT, new SizeT(att.getLength()), (short[]) values.getStorage());
+        ret = nc4.nc_put_att_ushort(grpid, varid, att.getShortName(), Nc4prototypes.NC_USHORT, new SizeT(att.getLength()), (short[]) arrayStorage);
         break;
       case SHORT:
-        ret = nc4.nc_put_att_short(grpid, varid, att.getShortName(), Nc4prototypes.NC_SHORT, new SizeT(att.getLength()), (short[]) values.getStorage());
+        ret = nc4.nc_put_att_short(grpid, varid, att.getShortName(), Nc4prototypes.NC_SHORT, new SizeT(att.getLength()), (short[]) arrayStorage);
         break;
     }
 

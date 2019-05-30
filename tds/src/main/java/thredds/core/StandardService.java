@@ -19,12 +19,14 @@ public enum StandardService {
   cdmrFeaturePoint(ServiceType.CdmrFeature, "/cdmrfeature/point/"),
   dap4(ServiceType.DAP4, "/dap4/"),
   httpServer(ServiceType.HTTPServer, "/fileServer/"),
+  jupyterNotebook(ServiceType.JupyterNotebook, "/notebook/"),
   resolver(ServiceType.Resolver, ""),
   netcdfSubsetGrid(ServiceType.NetcdfSubset, "/ncss/grid/"),    // heres a wrinkle
   netcdfSubsetPoint(ServiceType.NetcdfSubset, "/ncss/point/"),
   opendap(ServiceType.OPENDAP, "/dodsC/"),
   wcs(ServiceType.WCS, "/wcs/"),
   wms(ServiceType.WMS, "/wms/"),
+  wfs(ServiceType.WFS, "/wfs/"),
 
   iso(ServiceType.ISO, "/iso/"),
   iso_ncml(ServiceType.NCML, "/ncml/"),

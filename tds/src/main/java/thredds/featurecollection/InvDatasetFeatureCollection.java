@@ -19,6 +19,7 @@ import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dt.GridDataset;
 import ucar.nc2.ft.FeatureDatasetPoint;
 import ucar.nc2.ft2.coverage.CoverageCollection;
+import ucar.nc2.ft2.simpgeometry.SimpleGeometryFeatureDataset;
 import ucar.nc2.time.CalendarDateRange;
 import ucar.nc2.util.URLnaming;
 
@@ -172,7 +173,8 @@ public abstract class InvDatasetFeatureCollection implements Closeable {
         nestedOk.add(service);
       }
     }
-    virtualService = new Service("VirtualServices", "", ServiceType.Compound.toString(), null, null, nestedOk, orgService.getProperties());
+    virtualService = new Service("VirtualServices", "", ServiceType.Compound.toString(), ServiceType.Compound.getDescription(),
+            null, nestedOk, orgService.getProperties(), ServiceType.Compound.getAccessType());
   }
 
   public void close() {
@@ -532,6 +534,9 @@ public abstract class InvDatasetFeatureCollection implements Closeable {
   }
 
   public CoverageCollection getGridCoverage(String matchPath) throws IOException {
+    return null;
+  }
+  public SimpleGeometryFeatureDataset getSimpleGeometryDataset(String matchPath) throws IOException{
     return null;
   }
 

@@ -4,20 +4,16 @@
 
 package dap4.test;
 
-import dap4.core.data.DSPRegistry;
 import dap4.core.dmr.parser.DOM4Parser;
 import dap4.core.util.DapDump;
 import dap4.dap4lib.ChunkInputStream;
-import dap4.dap4lib.FileDSP;
 import dap4.dap4lib.RequestMode;
 import dap4.servlet.DapCache;
 import dap4.servlet.Generator;
-import dap4.servlet.SynDSP;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -26,10 +22,11 @@ import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import thredds.server.dap4.Dap4Controller;
+import ucar.nc2.jni.netcdf.Nc4Iosp;
+import ucar.nc2.jni.netcdf.Nc4wrapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -43,9 +40,31 @@ import java.util.List;
  * test client side deserialization (see TestCDMClient).
  */
 
+/*
+Normally, we would like to use Spring applicationContext
+and autowiring for this class.
+This can work under, say, Jenkins or Travis, but
+it fails under Intellij at the moment because of Mocking.
+I have managed to get it to work partly, but currently it
+crashes trying to initialize the ChronicleMap cache.
+It should be noted that AFAIK none of the Mocking tests will
+work under Intellij; TestServlet is just one example.
+
+I have included the necessary changes marked with the tag
+USESPRING to remind me of what needs to be done someday.
+*/
+
+/* USESPRING
+@RunWith(SpringJUnit4ClassRunner.class)
+@WebAppConfiguration
+@ContextConfiguration(
+        locations = {"/WEB-INF/applicationContext.xml", "/WEB-INF/spring-servlet.xml"},
+        loader = MockTdsContextLoader.class)
+*/
+
 public class TestServlet extends DapTestCommon
 {
-    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    static final boolean USESPRING = false;
 
     static public boolean DEBUG = false;
     static public boolean DEBUGDATA = false;
@@ -138,18 +157,29 @@ public class TestServlet extends DapTestCommon
 
     protected List<TestCase> chosentests = new ArrayList<TestCase>();
 
+    /* USESPRING
+    @Autowired
+	private WebApplicationContext wac;
+    */
+
     //////////////////////////////////////////////////
 
     @Before
     public void setup()
             throws Exception
     {
+        super.bindstd();
+        Nc4wrapper.TRACE = false;
         //if(DEBUGDATA) DapController.DUMPDATA = true;
-
-        StandaloneMockMvcBuilder mvcbuilder =
-                MockMvcBuilders.standaloneSetup(new Dap4Controller());
-        mvcbuilder.setValidator(new TestServlet.NullValidator());
-        this.mockMvc = mvcbuilder.build();
+        /*USESPRING
+          this.mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
+	else */
+        {
+            StandaloneMockMvcBuilder mvcbuilder =
+                    MockMvcBuilders.standaloneSetup(new Dap4Controller());
+            mvcbuilder.setValidator(new TestServlet.NullValidator());
+            this.mockMvc = mvcbuilder.build();
+        }
         testSetup();
         if(prop_ascii)
             Generator.setASCII(true);
@@ -158,6 +188,14 @@ public class TestServlet extends DapTestCommon
                 canonjoin(getResourceRoot(), GENERATEDIR));
         defineAllTestcases();
         chooseTestcases();
+    }
+
+    @After
+    public void cleanup()
+            throws Exception
+    {
+        super.unbindstd();
+        Nc4wrapper.TRACE = false;
     }
 
     //////////////////////////////////////////////////
@@ -188,9 +226,14 @@ public class TestServlet extends DapTestCommon
     public void testServlet()
             throws Exception
     {
-        DapCache.flush();
-        for(TestCase testcase : chosentests) {
-            doOneTest(testcase);
+        Nc4Iosp.setLogLevel(5);
+        try {
+            DapCache.flush();
+            for(TestCase testcase : chosentests) {
+                doOneTest(testcase);
+            }
+        } finally {
+            Nc4Iosp.setLogLevel(0);
         }
     }
 
@@ -201,21 +244,20 @@ public class TestServlet extends DapTestCommon
     doOneTest(TestCase testcase)
             throws Exception
     {
-        stderr.println("Testcase: " + testcase.testinputpath);
-        stderr.println("Baseline: " + testcase.baselinepath);
-        stderr.flush();
+        System.err.println("Testcase: " + testcase.testinputpath);
+        System.err.println("Baseline: " + testcase.baselinepath);
         if(PARSEDEBUG) DOM4Parser.setGlobalDebugLevel(1);
         for(String extension : testcase.extensions) {
             RequestMode ext = RequestMode.modeFor(extension);
             switch (ext) {
-            case DMR:
-                dodmr(testcase);
-                break;
-            case DAP:
-                dodata(testcase);
-                break;
-            default:
-                Assert.assertTrue("Unknown extension", false);
+                case DMR:
+                    dodmr(testcase);
+                    break;
+                case DAP:
+                    dodata(testcase);
+                    break;
+                default:
+                    Assert.assertTrue("Unknown extension", false);
             }
         }
     }
@@ -248,7 +290,7 @@ public class TestServlet extends DapTestCommon
         } else if(prop_diff) { //compare with baseline
             // Read the baseline file
             String baselinecontent = readfile(testcase.baselinepath + ".dmr");
-            stderr.println("DMR Comparison");
+            System.err.println("DMR Comparison");
             Assert.assertTrue("***Fail", same(getTitle(), baselinecontent, sdmr));
         }
     }
@@ -301,7 +343,7 @@ public class TestServlet extends DapTestCommon
         if(prop_diff) {
             //compare with baseline
             // Read the baseline file
-            stderr.println("Data Comparison:");
+            System.err.println("Data Comparison:");
             String baselinecontent = readfile(testcase.baselinepath + ".dap");
             Assert.assertTrue("***Fail", same(getTitle(), baselinecontent, sdata));
         }

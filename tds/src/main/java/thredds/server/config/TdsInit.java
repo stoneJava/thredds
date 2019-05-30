@@ -26,6 +26,7 @@ import thredds.server.catalog.DatasetScan;
 import thredds.server.ncss.controller.NcssDiskCache;
 import thredds.server.ncss.format.FormatsAvailabilityService;
 import thredds.server.ncss.format.SupportedFormat;
+import thredds.server.notebook.JupyterNotebookServiceCache;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.grib.GribIndexCache;
@@ -92,6 +93,9 @@ public class TdsInit implements ApplicationListener<ContextRefreshedEvent>, Disp
   private AllowedServices allowedServices;
 
   @Autowired
+  private JupyterNotebookServiceCache jupyterNotebooks;
+
+  @Autowired
   private NcssDiskCache ncssDiskCache;
 
   private Timer cdmDiskCacheTimer;
@@ -120,6 +124,8 @@ public class TdsInit implements ApplicationListener<ContextRefreshedEvent>, Disp
           initThreddsConfig();
           readThreddsConfig();
           logVersionMessage();
+          // add warning about web start deprecation
+          startupLog.warn("Web Start has been deprecated for >Java 9 and is slated for removal - see http://www.oracle.com/technetwork/java/eol-135779.html)");
 
           // read catalogs
           String readModeS = ThreddsConfig.get("ConfigCatalog.reread", "always");
@@ -226,6 +232,7 @@ public class TdsInit implements ApplicationListener<ContextRefreshedEvent>, Disp
     allowedServices.setAllowService(StandardService.iso_ncml, ThreddsConfig.getBoolean("NCISO.ncmlAllow"));
     allowedServices.setAllowService(StandardService.uddc, ThreddsConfig.getBoolean("NCISO.uddcAllow"));
     allowedServices.setAllowService(StandardService.iso, ThreddsConfig.getBoolean("NCISO.isoAllow"));
+    allowedServices.setAllowService(StandardService.jupyterNotebook, ThreddsConfig.getBoolean("JupyterNotebookService.allow"));
 
 
     // CDM configuration
@@ -407,6 +414,13 @@ public class TdsInit implements ApplicationListener<ContextRefreshedEvent>, Disp
     }
     configCatalogInitializer.setTrackerDir(trackerDir);
     configCatalogInitializer.setMaxDatasetToTrack(trackerMax);
+
+    // Jupyter notebook service cache
+    if (allowedServices.isAllowed(StandardService.jupyterNotebook)) {
+      max = ThreddsConfig.getInt("JupyterNotebookService.maxFiles", 100);
+      secs = ThreddsConfig.getSeconds("JupyterNotebookService.maxAge", 60*60);
+      jupyterNotebooks.init(max, secs);
+    }
   }
 
   static private class CacheScourTask extends TimerTask {

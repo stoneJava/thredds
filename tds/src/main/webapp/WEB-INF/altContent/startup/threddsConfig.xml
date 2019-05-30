@@ -37,20 +37,23 @@
 
   <!--
    * Setup for generated HTML pages.
-   *
-   * NOTE: URLs may be absolute or relative, relative URLs must be relative
-   * to the webapp URL, i.e., http://server:port/thredds/.
     -->
   <htmlSetup>
     <!--
      * CSS documents used in generated HTML pages.
-     * The CSS document given in the "catalogCssUrl" element is used for all pages
-     * that are HTML catalog views. The CSS document given in the "standardCssUrl"
-     * element is used in all other generated HTML pages.
+     * The CSS document given in the "catalogCssUrl" element is used for HTML catalog views,
+     * "datasetCssUrl" is used for the dataset access HTML view,
+     * and the CSS document given in the "standardCssUrl"element is used in all other generated HTML pages.
+     * The OPeNDAP HTML form is treated special - the only CSS document applied to this page is
+     * defined by the `openDapCssUrl` element.
+     *
+     * NOTE: CSS documents should be placed inside tds.content.root.path/thredds/public
+     *
 
-    <standardCssUrl>tds.css</standardCssUrl>
-    <catalogCssUrl>tdsCat.css</catalogCssUrl>
-    <openDapCssUrl>tdsDap.css</openDapCssUrl>
+     <standardCssUrl>standard.css</standardCssUrl>
+     <catalogCssUrl>catalog.css</catalogCssUrl>
+     <datasetCssUrl>dataset.css</datasetCssUrl>
+     <openDapCssUrl>tdsDap.css</openDapCssUrl>
      * -->
 
     <!--
@@ -59,6 +62,14 @@
      * requests for data, only browsing the catalog.
 
     <googleTrackingCode></googleTrackingCode>
+    -->
+
+    <!--
+     * Allow the TDS to generate JSON-LD in Dataset HTML pages following
+     * schema.org Dataset (https://schema.org/Dataset)
+     * The default is false, as this is experimental
+
+    <generateDatasetJsonLD>false</generateDatasetJsonLD>
     -->
 
   </htmlSetup>
@@ -173,14 +184,18 @@
     <typicalDataset>penultimate</typicalDataset>
   </Aggregation>
   -->
+  
+  <NetcdfSubsetService>
+    <scour>15 min</scour>
+    <maxAge>30 min</maxAge>
+  </NetcdfSubsetService>
 
   <!--
-  The Netcdf Subset Service is off by default.
-  <NetcdfSubsetService>
-    <allow>false</allow>
-    <scour>10 min</scour>
-    <maxAge>-1 min</maxAge>
-  </NetcdfSubsetService>
+  <JupyterNotebookService>
+    <allow>true</allow>
+    <maxAge>60</scour>
+    <maxFiles>100</maxFiles>
+  </JupyterNotebookService>
   -->
 
   <!--
@@ -192,10 +207,10 @@
     -->
   
   <!--
-  The WCS Service is off by default.
+  The WCS Service is on by default.
   Also, off by default (and encouraged) is operating on a remote dataset.
   <WCS>
-    <allow>false</allow>
+    <allow>true</allow>
     <allowRemote>false</allowRemote>
     <scour>15 min</scour>
     <maxAge>30 min</maxAge>
@@ -204,7 +219,7 @@
 
   <!--
   <WMS>
-    <allow>false</allow>
+    <allow>true</allow>
     <allowRemote>false</allowRemote>
     <maxImageWidth>2048</maxImageWidth>
     <maxImageHeight>2048</maxImageHeight>
@@ -213,9 +228,9 @@
 
   <!--
   <NCISO>
-    <ncmlAllow>false</ncmlAllow>
-    <uddcAllow>false</uddcAllow>
-    <isoAllow>false</isoAllow>
+    <ncmlAllow>true</ncmlAllow>
+    <uddcAllow>true</uddcAllow>
+    <isoAllow>true</isoAllow>
   </NCISO>
   -->
 

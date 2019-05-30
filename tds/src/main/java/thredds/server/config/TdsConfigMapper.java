@@ -95,15 +95,18 @@ class TdsConfigMapper {
 
 
   enum HtmlConfigMappings {
-    HTML_STANDARD_CSS_URL("htmlSetup.standardCssUrl", null, "tds.css"),
-    HTML_CATALOG_CSS_URL("htmlSetup.catalogCssUrl", null, "tdsCat.css"),
+    HTML_STANDARD_CSS_URL("htmlSetup.standardCssUrl", null, ""),
+    HTML_CATALOG_CSS_URL("htmlSetup.catalogCssUrl", null, ""),
+    HTML_DATASET_CSS_URL("htmlSetup.datasetCssUrl", null, ""),
+    HTML_OPENDAP_CSS_URL("htmlSetup.openDapCssUrl", null, "tdsDap.css"),
     GOOGLE_TRACKING_CODE("htmlSetup.googleTrackingCode", null, ""),
 
     HTML_FOLDER_ICON_URL("htmlSetup.folderIconUrl", null, "folder.gif"),
     HTML_FOLDER_ICON_ALT("htmlSetup.folderIconAlt", null, "Folder"),
     HTML_DATASET_ICON_URL("htmlSetup.datasetIconUrl", null, ""),
     HTML_DATASET_ICON_ALT("htmlSetup.datasetIconAlt", null, ""),
-    HTML_USE_REMOTE_CAT_SERVICE("htmlSetup.useRemoteCatalogService", null, "true");
+    HTML_USE_REMOTE_CAT_SERVICE("htmlSetup.useRemoteCatalogService", null, "true"),
+    HTML_GENERATE_DATASET_JSON_LD("htmlSetup.generateDatasetJsonLD", null, "false");
 
     private String key;
     private String alternateKey;
@@ -136,6 +139,8 @@ class TdsConfigMapper {
 
       htmlConfig.setPageCssUrl(HTML_STANDARD_CSS_URL.getValueFromThreddsConfig());
       htmlConfig.setCatalogCssUrl(HTML_CATALOG_CSS_URL.getValueFromThreddsConfig());
+      htmlConfig.setDatasetCssUrl(HTML_DATASET_CSS_URL.getValueFromThreddsConfig());
+      htmlConfig.setOpenDapCssUrl(HTML_OPENDAP_CSS_URL.getValueFromThreddsConfig());
       htmlConfig.setGoogleTrackingCode(GOOGLE_TRACKING_CODE.getValueFromThreddsConfig());
 
       htmlConfig.setFolderIconUrl(HTML_FOLDER_ICON_URL.getValueFromThreddsConfig());
@@ -144,6 +149,7 @@ class TdsConfigMapper {
       htmlConfig.setDatasetIconAlt(HTML_DATASET_ICON_ALT.getValueFromThreddsConfig());
 
       htmlConfig.setUseRemoteCatalogService(Boolean.parseBoolean(HTML_USE_REMOTE_CAT_SERVICE.getValueFromThreddsConfig()));
+      htmlConfig.setGenerateDatasetJsonLD(Boolean.parseBoolean(HTML_GENERATE_DATASET_JSON_LD.getValueFromThreddsConfig()));
     }
   }
 

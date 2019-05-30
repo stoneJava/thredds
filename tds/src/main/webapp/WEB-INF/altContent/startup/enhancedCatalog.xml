@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
    name="Unidata THREDDS-IDD NetCDF-OpenDAP Server" version="1.0.1">
-  
-  <service name="latest" serviceType="Resolver" base="" />
-  <service name="both" serviceType="Compound" base="">
-    <service name="ncdods" serviceType="OPENDAP" base="/thredds/dodsC/" />
-    <service name="HTTPServer" serviceType="HTTPServer" base="/thredds/fileServer/" />
-  </service>
 
   <dataset name="NCEP Model Data">
     <metadata inherited="true">
-      <serviceName>both</serviceName>
       <authority>edu.ucar.unidata</authority>
       <dataType>Grid</dataType>
       <dataFormat>NetCDF</dataFormat>
@@ -52,21 +45,17 @@
             <units>km</units>
           </updown>
         </geospatialCoverage>
-        <variables vocabulary="GRIB-1" />
-        <variables vocabulary="">
-          <variable name="Z_sfc" vocabulary_name="" units="gp m">Geopotential height, gpm</variable>
-        </variables>
       </metadata>
 
       <filter>
         <include wildcard="*eta_211.nc" />
       </filter>
-      <addID/>
+
       <sort>
         <lexigraphicByName increasing="false"/>
       </sort>
       <addLatest/>
-      <addDatasetSize/>
+
       <addTimeCoverage datasetNameMatchPattern="([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{2})_eta_211.nc$"
                        startTimeSubstitutionPattern="$1-$2-$3T$4:00:00"
                        duration="60 hours" />
